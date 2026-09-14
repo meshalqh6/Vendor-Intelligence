@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import VendorDetail from './pages/VendorDetail'
 import Ask from './pages/Ask'
 import AlertsPage from './pages/Alerts'
+import Opportunity from './pages/Opportunity'
 
 export default function App() {
   const [health, setHealth] = useState<any>(null)
@@ -24,6 +25,7 @@ export default function App() {
           <NavLink to="/" end>◱ Dashboard</NavLink>
           <NavLink to="/ask">✦ Ask VendorLens</NavLink>
           <NavLink to="/alerts">⚑ Alerts</NavLink>
+          <NavLink to="/opportunity">◎ Opportunity Match</NavLink>
         </nav>
         <div className="foot">
           {health && (
@@ -44,6 +46,7 @@ export default function App() {
           <Route path="/vendors/:code" element={<VendorDetail />} />
           <Route path="/ask" element={<Ask />} />
           <Route path="/alerts" element={<AlertsPage />} />
+          <Route path="/opportunity" element={<Opportunity />} />
         </Routes>
       </main>
     </div>
