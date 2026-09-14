@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AskEvent, Alerts, Scorecard, VendorsResponse } from './types'
+import type { AskEvent, Alerts, OpportunityMatchRequest, OpportunityMatchResponse, Scorecard, VendorsResponse } from './types'
 
 const BASE = import.meta.env.VITE_API_URL || '/api'
 const client = axios.create({ baseURL: BASE })
@@ -60,4 +60,8 @@ export async function askStream(
       }
     }
   }
+}
+
+export async function matchVendors(payload: OpportunityMatchRequest): Promise<OpportunityMatchResponse> {
+  return (await client.post('/opportunities/match', payload)).data
 }
