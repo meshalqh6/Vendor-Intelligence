@@ -124,6 +124,49 @@ forces **High Risk regardless of score** — see `config/scoring.yaml`.
   exactly; 2.6–4.0s per answer. Run `python scripts/check_llm.py` to repeat the
   check — it prints each answer next to the engine's authoritative values.
 
+
+## Opportunity matching
+
+The Opportunity Match page ranks vendors for a specific procurement request through:
+
+- Capability fit
+- Preferred-partner status
+- Historical supplier performance
+- Lead time
+- Payment terms
+- Spend balance
+- Opportunity-specific commercial value
+
+The ranking is exposed through:
+
+```text
+POST /api/opportunities/match
+```
+
+Historical performance and quote-specific commercial inputs are kept separate. A vendor's opportunity score does not overwrite its historical scorecard, and blocked or suspended vendors are marked ineligible.
+
+Example request:
+
+```json
+{
+  "category": "Logistics",
+  "required_capabilities": ["warehousing", "last-mile delivery"],
+  "max_lead_time_days": 30,
+  "minimum_payment_terms_days": 45,
+  "preferred_vendor_codes": ["SUP-1001"],
+  "vendor_quotes": [
+    {
+      "vendor_code": "SUP-1001",
+      "capability_fit": 92,
+      "lead_time_days": 14,
+      "payment_terms_days": 60,
+      "spend_balance": 80,
+      "commercial_value": 75
+    }
+  ]
+}
+```
+
 ## Not built (per demo scope)
 No authentication, multi-tenancy, user management, or real SAP connector. This is a
 demo that proves the evaluation logic and the traceable Q&A, not a production system.
