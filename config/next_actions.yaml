@@ -1,0 +1,61 @@
+# Next-action matrix: 4 classifications x 4 risk levels = 16 cells.
+# The rules engine (backend/app/engine/actions.py) looks up
+# (classification, risk) and returns {recommended_action, system_control}.
+# Stored here — not in code — so the client can tune the playbook live.
+
+matrix:
+  Preferred:
+    Low:
+      recommended_action: "Maintain preferred status; eligible for strategic partnership and volume growth."
+      system_control: "Auto-approve new business; standard monitoring."
+    Medium:
+      recommended_action: "Retain preferred status; clear minor observations at next review."
+      system_control: "Auto-approve new business; flag observations for review."
+    Moderate:
+      recommended_action: "Investigate repeated minor NCRs / delayed CAPA closure despite strong score."
+      system_control: "Allow existing business; require CAPA closure plan before volume increase."
+    High:
+      recommended_action: "Escalate to management review; a critical trigger overrides the high score."
+      system_control: "Restrict new business; escalate to management review."
+
+  Approved:
+    Low:
+      recommended_action: "Maintain approved status; continue standard performance monitoring."
+      system_control: "Auto-approve new business; standard monitoring."
+    Medium:
+      recommended_action: "Continue approved status; monitor minor observations."
+      system_control: "Auto-approve new business; standard monitoring."
+    Moderate:
+      recommended_action: "Require corrective action plan for repeated minor NCRs before expanding scope."
+      system_control: "Allow existing business; restrict scope expansion until CAPA closure."
+    High:
+      recommended_action: "Escalate to management review; address critical trigger before any new award."
+      system_control: "Restrict new business; escalate to management review."
+
+  Conditional:
+    Low:
+      recommended_action: "Improvement plan required to reach Approved; monitor quality and delivery."
+      system_control: "Allow existing business; require improvement plan."
+    Medium:
+      recommended_action: "Formal improvement plan with milestones; increase monitoring frequency."
+      system_control: "Allow existing business; require improvement plan; heightened monitoring."
+    Moderate:
+      recommended_action: "Restrict new business until CAPA closure; conditional standing with repeated minor NCRs."
+      system_control: "Restrict new business until CAPA closure."
+    High:
+      recommended_action: "Escalate to management review; resolve critical trigger before continuing engagement."
+      system_control: "Restrict new business; escalate to management review."
+
+  Reassessment Required:
+    Low:
+      recommended_action: "Full requalification required; performance below acceptable threshold."
+      system_control: "Suspend new business; initiate requalification."
+    Medium:
+      recommended_action: "Full requalification required; document and close outstanding observations."
+      system_control: "Suspend new business; initiate requalification."
+    Moderate:
+      recommended_action: "Block until requalification completed; repeated minor NCRs and delayed CAPA closure."
+      system_control: "Block all business until requalification is completed."
+    High:
+      recommended_action: "Block until requalification completed; escalate critical trigger to management review."
+      system_control: "Block all business until requalification is completed; escalate to management review."

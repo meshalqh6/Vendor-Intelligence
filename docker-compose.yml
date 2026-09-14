@@ -1,0 +1,41 @@
+# VendorLens — one-command local demo.
+#   docker compose up --build
+# Then open http://localhost:8080/
+#
+# The frontend (nginx) is the only published service; it serves the React build
+# and reverse-proxies /api to the backend on the internal network (single origin).
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: vendorlens-backend
+    environment:
+      # Optional — set a key for the selected provider to use a live model.
+      # No key => deterministic mock responder (the demo runs fully without one).
+      - VENDORLENS_LLM_PROVIDER=${VENDORLENS_LLM_PROVIDER:-anthropic}
+      # Empty => the backend picks the provider's default model.
+      - VENDORLENS_MODEL=${VENDORLENS_MODEL:-}
+      # Anthropic / Foundry
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - VENDORLENS_FALLBACK_MODEL=${VENDORLENS_FALLBACK_MODEL:-claude-opus-4-8}
+      - VENDORLENS_FOUNDRY_RESOURCE=${VENDORLENS_FOUNDRY_RESOURCE:-}
+      # Google Gemini / Vertex AI
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-us-central1}
+      - VENDORLENS_GEMINI_THINKING=${VENDORLENS_GEMINI_THINKING:-low}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: vendorlens-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

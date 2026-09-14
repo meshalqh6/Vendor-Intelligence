@@ -1,0 +1,171 @@
+# VendorLens scoring configuration.
+# All weights, bands and thresholds live here — NOT in code — so they can be
+# shown and changed live during the demo. The rules engine
+# (backend/app/engine/) loads this file; the LLM never computes from it.
+
+# ---------------------------------------------------------------------------
+# Supplier KPIs — weights must sum to 1.0
+# ---------------------------------------------------------------------------
+supplier_kpis:
+  quality:
+    label: "Quality Performance"
+    weight: 0.35        # (accepted lot qty / total lot qty received) * 100
+  delivery:
+    label: "Delivery Performance"
+    weight: 0.25        # per-delivery banding, then averaged
+  compliance:
+    label: "Compliance & Certifications"
+    weight: 0.20        # (valid documents / required documents) * 100
+  ncr_capa:
+    label: "NCR/CAPA Performance"
+    # TODO: confirm with client — source document states 20% in the weight column
+    # but "Weighted Score = KPI Score x 15%" in the methodology text. Only 20%
+    # makes the four supplier weights sum to 100%, so 20% is the default here.
+    # See README "Open questions".
+    weight: 0.20        # per-NCR closure banding, then averaged
+
+# ---------------------------------------------------------------------------
+# Service-provider KPIs — weights must sum to 1.0
+# ---------------------------------------------------------------------------
+service_provider_kpis:
+  sla:
+    label: "SLA Achievement"
+    weight: 0.25        # work orders completed within SLA / total * 100
+  service_quality:
+    label: "Service Quality"
+    weight: 0.25        # avg end-user quality rating at service confirmation
+  response_time:
+    label: "Response Time"
+    weight: 0.20        # avg end-user response rating
+  hse:
+    label: "HSE Performance"
+    weight: 0.15        # avg end-user HSE rating; any incident forces escalation
+  compliance_docs:
+    label: "Compliance Documentation"
+    weight: 0.10        # (valid documents / required documents) * 100
+  capa:
+    label: "CAPA Performance"
+    weight: 0.05        # CAPAs closed within due date / total * 100
+
+# ---------------------------------------------------------------------------
+# Delivery banding — PO requested delivery date vs actual GRN posting date.
+# `max_days` is inclusive upper bound; the first band whose max_days is not
+# exceeded wins. The final `null` band is the catch-all critical delay.
+# ---------------------------------------------------------------------------
+delivery_banding:
+  - band: "On-Time"        # within 2 weeks
+    max_days: 14
+    score: 100
+  - band: "Minor Delay"    # 2 to 3 weeks
+    max_days: 21
+    score: 85
+  - band: "Major Delay"    # 3 to 4 weeks
+    max_days: 28
+    score: 70
+  - band: "Critical Delay" # over 4 weeks
+    max_days: null
+    score: 50
+
+# ---------------------------------------------------------------------------
+# NCR/CAPA banding — closure date vs approved due date (days late).
+# days_late <= max_days_late picks the band. Final null band = worst grade.
+# ---------------------------------------------------------------------------
+ncr_capa_banding:
+  - grade: "A"   # on or before due date
+    max_days_late: 0
+    score: 100
+  - grade: "B"   # up to 1 week late
+    max_days_late: 7
+    score: 90
+  - grade: "C"   # up to 2 weeks late
+    max_days_late: 14
+    score: 75
+  - grade: "D"   # up to 4 weeks late
+    max_days_late: 28
+    score: 40
+  - grade: "E"   # beyond 4 weeks / still open past due — overdue trigger
+    max_days_late: null
+    score: 40
+
+# Closure later than this many days past due (or still open past due by this
+# much) counts as a "CAPA overdue beyond limit" High-Risk trigger.
+capa_overdue_trigger_days: 28
+
+# ---------------------------------------------------------------------------
+# A–D rating scale for service-provider end-user ratings (0–100 input).
+# ---------------------------------------------------------------------------
+rating_scale:
+  - grade: "A"
+    min: 95
+  - grade: "B"
+    min: 85
+  - grade: "C"
+    min: 75
+  - grade: "D"
+    min: 0
+
+# ---------------------------------------------------------------------------
+# Performance classification on the final weighted score (applies to both
+# suppliers and service providers).
+# ---------------------------------------------------------------------------
+classification:
+  - label: "Preferred"
+    min_score: 95
+  - label: "Approved"
+    min_score: 85
+  - label: "Conditional"
+    min_score: 75
+  - label: "Reassessment Required"
+    min_score: 0
+
+# ---------------------------------------------------------------------------
+# Risk status. Risk is independent of score and can override it. `High` is a
+# HARD OVERRIDE: any listed critical trigger forces High regardless of score
+# (e.g. 97% + expired ISO cert => Preferred / High Risk).
+# ---------------------------------------------------------------------------
+risk:
+  low:
+    min_score: 95
+  medium:
+    min_score: 85
+  moderate:
+    min_score: 75
+  # Any of these critical triggers forces High risk regardless of score.
+  high_triggers:
+    - expired_mandatory_document
+    - critical_ncr_open
+    - capa_overdue_beyond_limit
+    - hse_incident
+    - vendor_blocked_or_suspended
+# ---------------------------------------------------------------------------
+# NTT DATA opportunity matching
+# These weights apply to a specific procurement opportunity.
+# ---------------------------------------------------------------------------
+opportunity_matching:
+  capability_fit:
+    label: "Capability Fit"
+    weight: 0.30
+
+  preferred_partner:
+    label: "Preferred Partner"
+    weight: 0.15
+
+  supplier_rating:
+    label: "Supplier Rating"
+    weight: 0.15
+
+  lead_time:
+    label: "Lead Time"
+    weight: 0.15
+
+  payment_terms:
+    label: "Payment Terms"
+    weight: 0.10
+
+  spend_balance:
+    label: "Spend Balance"
+    weight: 0.10
+
+  opportunity_commercial_value:
+    label: "Opportunity Commercial Value"
+    weight: 0.05
