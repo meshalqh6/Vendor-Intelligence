@@ -5,14 +5,14 @@ retrieve/explain endpoint.
 
 import json
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .engine import build_alerts, build_scorecard, get_store, list_scorecards
+from .engine import build_alerts, build_scorecard, get_store, list_scorecards, match_vendors
 from .services import llm
 from .services.tools import execute as run_tool
 
@@ -79,6 +79,21 @@ def config():
     store = get_store()
     return {"scoring": store.scoring, "next_actions": store.next_actions,
             "as_of": store.as_of.isoformat()}
+
+
+class OpportunityMatchRequest(BaseModel):
+    category: Optional[str] = None
+    required_capabilities: List[str] = []
+    preferred_vendor_codes: List[str] = []
+    max_lead_time_days: Optional[float] = None
+    minimum_payment_terms_days: Optional[float] = None
+    vendor_quotes: List[Dict] = []
+
+
+@app.post("/api/opportunities/match")
+def opportunity_match(req: OpportunityMatchRequest):
+    """Rank vendors for one opportunity using deterministic, explainable rules."""
+    return match_vendors(get_store(), req.model_dump())
 
 
 # ---------------------------------------------------------------------------
