@@ -4,7 +4,7 @@ deterministic engine or raw source rows — the model can only retrieve, never
 compute. This is what makes the assistant's numbers traceable and un-fakeable.
 """
 
-from ..engine import build_alerts, build_scorecard, list_scorecards
+from ..engine import build_alerts, build_scorecard, list_scorecards, match_vendors
 
 # Tables the model may pull raw rows from, for citing individual source records.
 _SOURCE_TABLES = {
@@ -59,6 +59,27 @@ TOOL_DEFS = [
             "required": ["vendor_code", "table"],
         },
     },
+
+    {
+        "name": "match_vendors_to_opportunity",
+        "description": (
+            "Rank vendors for a specific procurement opportunity. Uses the "
+            "deterministic opportunity weights, historical vendor scorecards, and "
+            "request-specific quote inputs. Never treat quote values as permanent "
+            "vendor attributes."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category": {"type": "string"},
+                "required_capabilities": {"type": "array", "items": {"type": "string"}},
+                "preferred_vendor_codes": {"type": "array", "items": {"type": "string"}},
+                "max_lead_time_days": {"type": "number"},
+                "minimum_payment_terms_days": {"type": "number"},
+                "vendor_quotes": {"type": "array", "items": {"type": "object"}},
+            },
+        },
+    },
     {
         "name": "get_alerts",
         "description": (
@@ -111,6 +132,10 @@ def execute(store, name, tool_input):
             "hse_incidents": lambda: store.hse_incidents(vc),
         }[table]()
         return fetch[:60]
+
+
+    if name == "match_vendors_to_opportunity":
+        return match_vendors(store, tool_input or {})
 
     if name == "get_alerts":
         return build_alerts(store)
