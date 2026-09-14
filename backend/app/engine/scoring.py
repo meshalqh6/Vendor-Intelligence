@@ -269,3 +269,137 @@ def build_scorecard(store, vendor_code, include_sources=True):
 def list_scorecards(store, include_sources=False):
     return [build_scorecard(store, v["vendor_code"], include_sources=include_sources)
             for v in store.vendors()]
+
+
+# ---------------------------------------------------------------------------
+# Opportunity matching
+# ---------------------------------------------------------------------------
+def match_vendors(store, opportunity):
+    """Rank vendors for one opportunity using request-specific inputs.
+
+    Historical performance remains separate from opportunity fit. Optional
+    quote fields are supplied per request and are never stored as vendor data.
+    """
+    cfg = store.scoring.get("opportunity_matching", {})
+    vendors = store.vendors()
+    quotes = {
+        q.get("vendor_code"): q
+        for q in (opportunity.get("vendor_quotes") or [])
+        if q.get("vendor_code")
+    }
+    preferred = {str(v).lower() for v in (opportunity.get("preferred_vendor_codes") or [])}
+    required_category = str(opportunity.get("category") or "").strip().lower()
+    required_capabilities = {
+        str(v).strip().lower()
+        for v in (opportunity.get("required_capabilities") or [])
+    }
+    max_lead = opportunity.get("max_lead_time_days")
+    min_terms = opportunity.get("minimum_payment_terms_days")
+
+    def bounded(value, default=50.0):
+        try:
+            return max(0.0, min(100.0, float(value)))
+        except (TypeError, ValueError):
+            return default
+
+    def quote_value(quote, key, default=50.0):
+        return bounded(quote.get(key), default) if quote else default
+
+    def capability_fit(vendor, quote):
+        if quote and quote.get("capability_fit") is not None:
+            return bounded(quote["capability_fit"])
+        vendor_category = str(vendor.get("category") or "").lower()
+        if required_category and required_category in vendor_category:
+            return 100.0
+        if required_capabilities:
+            vendor_capabilities = {
+                str(v).lower()
+                for v in (vendor.get("capabilities") or [])
+            }
+            if vendor_capabilities:
+                matched = len(required_capabilities & vendor_capabilities)
+                return matched / len(required_capabilities) * 100
+        return 50.0
+
+    def lead_time_score(quote):
+        if not quote or quote.get("lead_time_days") is None:
+            return 50.0
+        days = float(quote["lead_time_days"])
+        if max_lead is None:
+            return 100.0 if days <= 14 else max(0.0, 100.0 - days)
+        if max_lead <= 0:
+            return 100.0 if days <= 0 else 0.0
+        return bounded(100.0 * max(0.0, 1.0 - (days - max_lead) / max_lead))
+
+    def payment_score(quote):
+        if not quote or quote.get("payment_terms_days") is None:
+            return 50.0
+        days = float(quote["payment_terms_days"])
+        if min_terms is None:
+            return bounded(days / 60.0 * 100.0)
+        return 100.0 if days >= min_terms else bounded(days / min_terms * 100.0)
+
+    results = []
+    for vendor in vendors:
+        code = vendor["vendor_code"]
+        quote = quotes.get(code, {})
+        card = build_scorecard(store, code, include_sources=True)
+        preferred_score = 100.0 if (
+            code.lower() in preferred or vendor["name"].lower() in preferred
+        ) else 0.0
+        metrics = {
+            "capability_fit": capability_fit(vendor, quote),
+            "preferred_partner": preferred_score,
+            "supplier_rating": card["final_score"] if card else 0.0,
+            "lead_time": lead_time_score(quote),
+            "payment_terms": payment_score(quote),
+            "spend_balance": quote_value(quote, "spend_balance"),
+            "opportunity_commercial_value": quote_value(
+                quote, "commercial_value", 50.0
+            ),
+        }
+        components = []
+        for key, metric in metrics.items():
+            entry = cfg.get(key, {"label": key, "weight": 0.0})
+            components.append({
+                "key": key,
+                "label": entry.get("label", key),
+                "weight": entry.get("weight", 0.0),
+                "value": _round(metric),
+                "contribution": _round(entry.get("weight", 0.0) * metric),
+            })
+        final_score = _round(sum(c["contribution"] for c in components))
+        blocked = bool(vendor.get("blocked_flag")) or str(
+            vendor.get("status") or ""
+        ).lower() in {"blocked", "suspended"}
+        results.append({
+            "vendor_code": code,
+            "name": vendor["name"],
+            "type": vendor["type"],
+            "category": vendor["category"],
+            "historical_score": card["final_score"] if card else None,
+            "historical_classification": card["classification"] if card else None,
+            "historical_risk": card["risk"] if card else None,
+            "opportunity_score": final_score,
+            "components": components,
+            "quote": quote,
+            "eligible": not blocked,
+            "eligibility_reason": (
+                "Vendor is blocked or suspended."
+                if blocked else "Eligible for consideration."
+            ),
+        })
+
+    results.sort(key=lambda item: (item["eligible"], item["opportunity_score"]), reverse=True)
+    return {
+        "opportunity": opportunity,
+        "weights": {
+            key: {
+                "label": value.get("label", key),
+                "weight": value.get("weight", 0.0),
+            }
+            for key, value in cfg.items()
+        },
+        "matches": results,
+        "as_of": store.as_of.isoformat(),
+    }
